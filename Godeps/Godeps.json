@@ -1,0 +1,5 @@
+{
+	"ImportPath": "data-collector",
+	"GoVersion": "go1.6",
+	"Deps": []
+}

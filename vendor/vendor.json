@@ -1,0 +1,13 @@
+{
+	"comment": "",
+	"ignore": "test",
+	"package": [
+		{
+			"checksumSHA1": "I0yEQ7PD38ZYbDWuayLBCyC+vMA=",
+			"path": "github.com/gorilla/websocket",
+			"revision": "a622679ebd7a3b813862379232f645f8e690e43f",
+			"revisionTime": "2016-03-09T18:36:44Z"
+		}
+	],
+	"rootPath": "data-collector"
+}
