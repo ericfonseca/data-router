@@ -50,7 +50,8 @@ func storeEvent(ts uint64, val float64, tag string) {
 	url := "https://apm-timeseries-services-hackapm.run.aws-usw02-pr.ice.predix.io/v2/time_series?file_type=json"
 	//"{\n  \"tags\": [\n    {\n      \"tagId\": \"TAG_HARD_BREAKS\",\n      \"errorCode\": null,\n      \"errorMessage\": null,\n      \"data\": [\n        {\n          \"ts\": 1469431390000,\n          \"v\": \"150.0\",\n          \"q\": \"3\"\n        }\n      ]\n    }\n  ]\n}"
 	//"{\n  \"tags\": [\n    {\n      \"tagId\": \"%s\",\n      \"errorCode\": null,\n      \"errorMessage\": null,\n      \"data\": [\n        {\n          \"ts\": %d,\n          \"v\": \"%f\",\n          \"q\": \"3\"\n        }\n      ]\n    }\n  ]\n}", tag, ts, val))
-	payload := strings.NewReader("{\n  \"tags\": [\n    {\n      \"tagId\": \"TAG_HARD_BREAKS\",\n      \"errorCode\": null,\n      \"errorMessage\": null,\n      \"data\": [\n        {\n          \"ts\": 1469431330000,\n          \"v\": \"155.0\",\n          \"q\": \"3\"\n        }\n      ]\n    }\n  ]\n}")
+	// payload := strings.NewReader("{\n  \"tags\": [\n    {\n      \"tagId\": \"Tag_Hard_Acceleration_1\",\n      \"errorCode\": null,\n      \"errorMessage\": null,\n      \"data\": [\n        {\n          \"ts\": 1469437375000,\n          \"v\": \"155.0\",\n          \"q\": \"3\"\n        }\n      ]\n    }\n  ]\n}")
+	payload := strings.NewReader(fmt.Sprintf("{\n  \"tags\": [\n    {\n      \"tagId\": \"%s\",\n      \"errorCode\": null,\n      \"errorMessage\": null,\n      \"data\": [\n        {\n          \"ts\": %d,\n          \"v\": \"%v\",\n          \"q\": \"3\"\n        }\n      ]\n    }\n  ]\n}", tag, ts, val))
 
 	req, _ := http.NewRequest("POST", url, payload)
 
@@ -88,7 +89,7 @@ func detectAccelerations(msg EdisonMessage) {
 
 	if (msg.X < -1*accThreshold) || (msg.Y < -1*accThreshold) {
 		decMap[msgId] = decMap[msgId] + 1
-		go storeEvent(msg.Timestamp, msg.Y, "HB_1")
+		go storeEvent(msg.Timestamp, msg.Y, "Tag_Hard_Acceleration_1")
 		if conn == nil {
 			fmt.Println("ERROR: no active conns")
 			return
@@ -185,4 +186,7 @@ func main() {
 	http.HandleFunc("/all", all)
 	http.HandleFunc("/mobile", mobile)
 	http.ListenAndServe(":"+os.Getenv("PORT"), nil)
+
+	// test ingest
+	// storeEvent(1469437879000, 1, "Tag_Hard_Breaks_2")
 }
