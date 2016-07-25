@@ -181,17 +181,23 @@ func mobile(w http.ResponseWriter, r *http.Request) {
 }
 
 func queryAPMTS(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	tag := r.URL.Query().Get("tag")
 	tenant := r.URL.Query().Get("tenant")
 
-	fmt.Println("TAG & TENANT", tag, tenant)
+	if len(tag) < 1 || len(tenant) < 1 {
+		w.WriteHeader(400)
+	}
 
 	url := fmt.Sprintf("https://apm-timeseries-services-hackapm.run.aws-usw02-pr.ice.predix.io/v2/time_series?operation=raw&tagList=%s&startTime=2010-12-31T00:28:03.000Z&endTime=2017-04-05T00:28:03.000Z&responseFormat=KAIROSDB", tag)
 
-	fmt.Println(url)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		fmt.Println("Failed to create GET request")
+		w.WriteHeader(500)
 
-	req, _ := http.NewRequest("GET", url, nil)
+	}
 
 	req.Header.Add("authorization", "bearer eyJhbGciOiJSUzI1NiJ9.eyJqdGkiOiJjYWViYTM4Mi1mZjcwLTQ0MmItOTIwZS1iNGRmZjI3MjQ4ZGIiLCJzdWIiOiI2YWQ5Nzg3Ny0zMTQ3LTQyYzUtOGIwNi1iY2U3NTU5OTNmMzMiLCJzY29wZSI6WyJwYXNzd29yZC53cml0ZSIsIm9wZW5pZCJdLCJjbGllbnRfaWQiOiJpbmdlc3Rvci45Y2YzM2NlMzdiZjY0YzU2ODFiNTE1YTZmNmFhZGY0NyIsImNpZCI6ImluZ2VzdG9yLjljZjMzY2UzN2JmNjRjNTY4MWI1MTVhNmY2YWFkZjQ3IiwiYXpwIjoiaW5nZXN0b3IuOWNmMzNjZTM3YmY2NGM1NjgxYjUxNWE2ZjZhYWRmNDciLCJncmFudF90eXBlIjoicGFzc3dvcmQiLCJ1c2VyX2lkIjoiNmFkOTc4NzctMzE0Ny00MmM1LThiMDYtYmNlNzU1OTkzZjMzIiwib3JpZ2luIjoidWFhIiwidXNlcl9uYW1lIjoic2siLCJlbWFpbCI6ImphbmVAZ2UuY29tIiwiYXV0aF90aW1lIjoxNDY5NDM5NDUyLCJyZXZfc2lnIjoiYjc0NzUwYmQiLCJpYXQiOjE0Njk0Mzk0NTIsImV4cCI6MTQ2OTUyNTg1MiwiaXNzIjoiaHR0cHM6Ly9kOWVmMTA2Yy03MDQ4LTQ4NmUtYTc5Zi05YzgwODI3YjhhMTQucHJlZGl4LXVhYS5ydW4uYXdzLXVzdzAyLXByLmljZS5wcmVkaXguaW8vb2F1dGgvdG9rZW4iLCJ6aWQiOiJkOWVmMTA2Yy03MDQ4LTQ4NmUtYTc5Zi05YzgwODI3YjhhMTQiLCJhdWQiOlsiaW5nZXN0b3IuOWNmMzNjZTM3YmY2NGM1NjgxYjUxNWE2ZjZhYWRmNDciLCJwYXNzd29yZCIsIm9wZW5pZCJdfQ.wC0Tfbq1m9W6OOmFTcJ0THJohRgV7SEdwH3tyoWX2by8MrbWGWT1Ne5Y4iioPkNeS0y987yKljp7YVghWcpyovKFknG_0RNttsf55u4lMiWTgxHaHidZU_UETLGS-byJYO5Bkn-xP-hG5-BNjpNDw4-u-xdUU_DCmY4XTR6QNA3uregJIGt-v8-dDej_z1fAN01Bw-MjrdD4zvHPU4UoYug4bBqw2ckYB9MWF94qRqj5iOsCALXOlJHaisAoPHQVgsQgJ8fFuh8DX9eEziQ1Bew5rEMzjPRtRzUDbwkEmjyEn9YPGSpp1kfCvloxZ6fLQcwuMbtJnqxCKvyU_bS6ow")
 	req.Header.Add("tenant", tenant)
@@ -199,13 +205,18 @@ func queryAPMTS(w http.ResponseWriter, r *http.Request) {
 	req.Header.Add("cache-control", "no-cache")
 	req.Header.Add("postman-token", "958d1a58-20f4-5361-fe72-aa149e73edf2")
 
-	res, _ := http.DefaultClient.Do(req)
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		fmt.Println("HTTP Request failed to execute")
+		w.WriteHeader(500)
+	}
 
 	defer res.Body.Close()
-	body, _ := ioutil.ReadAll(res.Body)
-
-	fmt.Println(res)
-
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		fmt.Println("Failed to read response body")
+		w.WriteHeader(500)
+	}
 	w.Write(body)
 }
 
