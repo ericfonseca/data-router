@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math"
 	"net/http"
 	"os"
 	"strings"
@@ -77,7 +78,7 @@ func detectAccelerations(msg EdisonMessage) {
 
 	if (msg.X > accThreshold) || (msg.Y > accThreshold) {
 		accMap[msgId] = accMap[msgId] + 1
-		go storeEvent(msg.Timestamp, msg.X, "HA_3")
+		go storeEvent(msg.Timestamp, math.Max(msg.X, msg.Y), "HA_1")
 		if conn == nil {
 			fmt.Println("ERROR: no active conns")
 			return
