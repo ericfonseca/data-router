@@ -75,7 +75,7 @@ func detectAccelerations(msg EdisonMessage) {
 
 	if (msg.X > accThreshold) || (msg.Y > accThreshold) {
 		accMap[msgId] = accMap[msgId] + 1
-		go storeEvent(msg.Timestamp, msg.X, "HA_1")
+		go storeEvent(msg.Timestamp, msg.X, "HA_3")
 		if conn == nil {
 			fmt.Println("ERROR: no active conns")
 			return
@@ -180,11 +180,41 @@ func mobile(w http.ResponseWriter, r *http.Request) {
 	detectAccelerations(msg)
 }
 
+func queryAPMTS(w http.ResponseWriter, r *http.Request) {
+
+	tag := r.URL.Query().Get("tag")
+	tenant := r.URL.Query().Get("tenant")
+
+	fmt.Println("TAG & TENANT", tag, tenant)
+
+	url := fmt.Sprintf("https://apm-timeseries-services-hackapm.run.aws-usw02-pr.ice.predix.io/v2/time_series?operation=raw&tagList=%s&startTime=2010-12-31T00:28:03.000Z&endTime=2017-04-05T00:28:03.000Z&responseFormat=KAIROSDB", tag)
+
+	fmt.Println(url)
+
+	req, _ := http.NewRequest("GET", url, nil)
+
+	req.Header.Add("authorization", "bearer eyJhbGciOiJSUzI1NiJ9.eyJqdGkiOiJjYWViYTM4Mi1mZjcwLTQ0MmItOTIwZS1iNGRmZjI3MjQ4ZGIiLCJzdWIiOiI2YWQ5Nzg3Ny0zMTQ3LTQyYzUtOGIwNi1iY2U3NTU5OTNmMzMiLCJzY29wZSI6WyJwYXNzd29yZC53cml0ZSIsIm9wZW5pZCJdLCJjbGllbnRfaWQiOiJpbmdlc3Rvci45Y2YzM2NlMzdiZjY0YzU2ODFiNTE1YTZmNmFhZGY0NyIsImNpZCI6ImluZ2VzdG9yLjljZjMzY2UzN2JmNjRjNTY4MWI1MTVhNmY2YWFkZjQ3IiwiYXpwIjoiaW5nZXN0b3IuOWNmMzNjZTM3YmY2NGM1NjgxYjUxNWE2ZjZhYWRmNDciLCJncmFudF90eXBlIjoicGFzc3dvcmQiLCJ1c2VyX2lkIjoiNmFkOTc4NzctMzE0Ny00MmM1LThiMDYtYmNlNzU1OTkzZjMzIiwib3JpZ2luIjoidWFhIiwidXNlcl9uYW1lIjoic2siLCJlbWFpbCI6ImphbmVAZ2UuY29tIiwiYXV0aF90aW1lIjoxNDY5NDM5NDUyLCJyZXZfc2lnIjoiYjc0NzUwYmQiLCJpYXQiOjE0Njk0Mzk0NTIsImV4cCI6MTQ2OTUyNTg1MiwiaXNzIjoiaHR0cHM6Ly9kOWVmMTA2Yy03MDQ4LTQ4NmUtYTc5Zi05YzgwODI3YjhhMTQucHJlZGl4LXVhYS5ydW4uYXdzLXVzdzAyLXByLmljZS5wcmVkaXguaW8vb2F1dGgvdG9rZW4iLCJ6aWQiOiJkOWVmMTA2Yy03MDQ4LTQ4NmUtYTc5Zi05YzgwODI3YjhhMTQiLCJhdWQiOlsiaW5nZXN0b3IuOWNmMzNjZTM3YmY2NGM1NjgxYjUxNWE2ZjZhYWRmNDciLCJwYXNzd29yZCIsIm9wZW5pZCJdfQ.wC0Tfbq1m9W6OOmFTcJ0THJohRgV7SEdwH3tyoWX2by8MrbWGWT1Ne5Y4iioPkNeS0y987yKljp7YVghWcpyovKFknG_0RNttsf55u4lMiWTgxHaHidZU_UETLGS-byJYO5Bkn-xP-hG5-BNjpNDw4-u-xdUU_DCmY4XTR6QNA3uregJIGt-v8-dDej_z1fAN01Bw-MjrdD4zvHPU4UoYug4bBqw2ckYB9MWF94qRqj5iOsCALXOlJHaisAoPHQVgsQgJ8fFuh8DX9eEziQ1Bew5rEMzjPRtRzUDbwkEmjyEn9YPGSpp1kfCvloxZ6fLQcwuMbtJnqxCKvyU_bS6ow")
+	req.Header.Add("tenant", tenant)
+	req.Header.Add("content-type", "application/json")
+	req.Header.Add("cache-control", "no-cache")
+	req.Header.Add("postman-token", "958d1a58-20f4-5361-fe72-aa149e73edf2")
+
+	res, _ := http.DefaultClient.Do(req)
+
+	defer res.Body.Close()
+	body, _ := ioutil.ReadAll(res.Body)
+
+	fmt.Println(res)
+
+	w.Write(body)
+}
+
 func main() {
 	http.HandleFunc("/", receive)
 	http.HandleFunc("/listen", listen)
 	http.HandleFunc("/all", all)
 	http.HandleFunc("/mobile", mobile)
+	http.HandleFunc("/queryTS", queryAPMTS)
 	http.ListenAndServe(":"+os.Getenv("PORT"), nil)
 
 	// test ingest
