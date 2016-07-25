@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -44,6 +45,7 @@ var (
 		WriteBufferSize: 1024,
 		CheckOrigin:     func(r *http.Request) bool { return true },
 	}
+	mutex = &sync.Mutex{}
 )
 
 func storeEvent(ts uint64, val float64, tag string) {
@@ -106,6 +108,7 @@ func calcLifetime(carId string) int {
 }
 
 func receive(w http.ResponseWriter, r *http.Request) {
+
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	var wrapper EdisonWrapper
 	body, err := ioutil.ReadAll(r.Body)
@@ -125,7 +128,10 @@ func receive(w http.ResponseWriter, r *http.Request) {
 	if !found {
 		startMap[msg.ID] = msg.Timestamp
 	}
+	mutex.Lock()
 	milesMap[msg.ID] = msg.Miles
+	mutex.Unlock()
+
 	detectAccelerations(msg)
 }
 
@@ -181,7 +187,7 @@ func mobile(w http.ResponseWriter, r *http.Request) {
 }
 
 func queryAPMTS(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Origin", fmt.Sprintf("localhost:8000"))
 
 	tag := r.URL.Query().Get("tag")
 	tenant := r.URL.Query().Get("tenant")
