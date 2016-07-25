@@ -46,7 +46,12 @@ var (
 		WriteBufferSize: 1024,
 		CheckOrigin:     func(r *http.Request) bool { return true },
 	}
-	mutex = &sync.Mutex{}
+
+	assetIdMapMutex = &sync.Mutex{}
+	decMapMutex     = &sync.Mutex{}
+	accMapMutex     = &sync.Mutex{}
+	milesMapMutex   = &sync.Mutex{}
+	startMapMutex   = &sync.Mutex{}
 )
 
 func storeEvent(ts uint64, val float64, tag string, apmId string, lifetime int, accs int) {
@@ -81,7 +86,9 @@ func detectAccelerations(msg EdisonMessage) {
 	msgId := msg.ID
 
 	if (msg.X > accThreshold) || (msg.Y > accThreshold) {
+		accMapMutex.Lock()
 		accMap[msgId] = accMap[msgId] + 1
+		accMapMutex.Unlock()
 		go storeEvent(msg.Timestamp, math.Max(msg.X, msg.Y), "Tag_Hard_Acceleration_1", assetIdMap[msgId], calcLifetime(msgId), accMap[msgId])
 		if conn == nil {
 			fmt.Println("ERROR: no active conns")
@@ -95,7 +102,10 @@ func detectAccelerations(msg EdisonMessage) {
 	}
 
 	if (msg.X < -1*accThreshold) || (msg.Y < -1*accThreshold) {
+		decMapMutex.Lock()
 		decMap[msgId] = decMap[msgId] + 1
+		decMapMutex.Unlock()
+
 		go storeEvent(msg.Timestamp, math.Max(msg.X, msg.Y), "Tag_Hard_Breaks_1", assetIdMap[msgId], calcLifetime(msgId), decMap[msgId])
 		if conn == nil {
 			fmt.Println("ERROR: no active conns")
@@ -136,9 +146,9 @@ func receive(w http.ResponseWriter, r *http.Request) {
 		assetIds = assetIds[1:]
 		assetIdMap[msg.ID] = headId
 	}
-	mutex.Lock()
+	milesMapMutex.Lock()
 	milesMap[msg.ID] = msg.Miles
-	mutex.Unlock()
+	milesMapMutex.Unlock()
 
 	detectAccelerations(msg)
 }
@@ -183,12 +193,20 @@ func mobile(w http.ResponseWriter, r *http.Request) {
 	msg := wrapper.Form
 	_, found := startMap[msg.ID]
 	if !found {
+		startMapMutex.Lock()
 		startMap[msg.ID] = msg.Timestamp
+		startMapMutex.Unlock()
+
 		headId := assetIds[0]
 		assetIds = assetIds[1:]
+		assetIdMapMutex.Lock()
 		assetIdMap[msg.ID] = headId
+		assetIdMapMutex.Unlock()
 	}
+	milesMapMutex.Lock()
 	milesMap[msg.ID] = msg.Miles
+	milesMapMutex.Unlock()
+
 	msg.X = msg.X / mobileScalingFactor
 	msg.Y = msg.Y / mobileScalingFactor
 	detectAccelerations(msg)
