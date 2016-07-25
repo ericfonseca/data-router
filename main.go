@@ -31,7 +31,7 @@ type EdisonMessage struct {
 var (
 	conn                *websocket.Conn
 	accThreshold        = 1.2
-	lifetimeMax         = 200000
+	lifetimeMax         = 150000
 	scalingFactor       = 500
 	mobileScalingFactor = 25.00
 	messageTypeText     = 1
@@ -254,6 +254,24 @@ func queryAPMTS(w http.ResponseWriter, r *http.Request) {
 	w.Write(body)
 }
 
+func gradualImprovement() {
+	ticker := time.NewTicker(1 * time.Second)
+	for {
+		select {
+		case <-ticker.C:
+			lifetimeMax += 250
+			for key, _ := range startMap {
+				msg := fmt.Sprintf("{\"carId\":\"%s\", \"apmId\":\"%s\", \"hardAcc\": %d, \"miles\": %d, \"lifetime\": %d}", key, assetIdMap[key], accMap[key], milesMap[key], calcLifetime(key))
+				fmt.Println("WS MSG: ", msg)
+				err := conn.WriteMessage(1, []byte(msg))
+				if err != nil {
+					fmt.Println("ERROR: could not write hard acc to ws")
+				}
+			}
+		}
+	}
+}
+
 func main() {
 	http.HandleFunc("/", receive)
 	http.HandleFunc("/listen", listen)
@@ -262,6 +280,7 @@ func main() {
 	http.HandleFunc("/queryTS", queryAPMTS)
 	http.ListenAndServe(":"+os.Getenv("PORT"), nil)
 
+	go gradualImprovement()
 	// test ingest
 	// storeEvent(1469437879000, 1, "Tag_Hard_Breaks_2")
 }
