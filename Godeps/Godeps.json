@@ -1,5 +1,5 @@
 {
-	"ImportPath": "data-collector",
+	"ImportPath": "data-router",
 	"GoVersion": "go1.6",
 	"Deps": []
 }
