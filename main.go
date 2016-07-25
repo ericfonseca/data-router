@@ -49,12 +49,16 @@ var (
 	mutex = &sync.Mutex{}
 )
 
-func storeEvent(ts uint64, val float64, tag string) {
+func storeEvent(ts uint64, val float64, tag string, apmId string, lifetime int, accs int) {
 	url := "https://apm-timeseries-services-hackapm.run.aws-usw02-pr.ice.predix.io/v2/time_series?file_type=json"
-	//"{\n  \"tags\": [\n    {\n      \"tagId\": \"TAG_HARD_BREAKS\",\n      \"errorCode\": null,\n      \"errorMessage\": null,\n      \"data\": [\n        {\n          \"ts\": 1469431390000,\n          \"v\": \"150.0\",\n          \"q\": \"3\"\n        }\n      ]\n    }\n  ]\n}"
-	//"{\n  \"tags\": [\n    {\n      \"tagId\": \"%s\",\n      \"errorCode\": null,\n      \"errorMessage\": null,\n      \"data\": [\n        {\n          \"ts\": %d,\n          \"v\": \"%f\",\n          \"q\": \"3\"\n        }\n      ]\n    }\n  ]\n}", tag, ts, val))
-	// payload := strings.NewReader("{\n  \"tags\": [\n    {\n      \"tagId\": \"Tag_Hard_Acceleration_1\",\n      \"errorCode\": null,\n      \"errorMessage\": null,\n      \"data\": [\n        {\n          \"ts\": 1469437375000,\n          \"v\": \"155.0\",\n          \"q\": \"3\"\n        }\n      ]\n    }\n  ]\n}")
-	payload := strings.NewReader(fmt.Sprintf("{\n  \"tags\": [\n    {\n      \"tagId\": \"%s\",\n      \"errorCode\": null,\n      \"errorMessage\": null,\n      \"data\": [\n        {\n          \"ts\": %d,\n          \"v\": \"%v\",\n          \"q\": \"3\"\n        }\n      ]\n    }\n  ]\n}", tag, ts, val))
+	body := "{\"tags\": ["
+	body += fmt.Sprintf("{\"tagId\": \"%s\",\"errorCode\": null,\"errorMessage\": null,\"data\": [{\"ts\": %d,\"v\": \"%v\",\"q\": \"3\"}]},", tag, ts, val)
+	body += fmt.Sprintf("{\"tagId\": \"%s\",\"errorCode\": null,\"errorMessage\": null,\"data\": [{\"ts\": %d,\"v\": \"%v\",\"q\": \"3\"}]},", fmt.Sprintf("%s.%s", apmId, "lifespan"), ts, lifetime)
+	body += fmt.Sprintf("{\"tagId\": \"%s\",\"errorCode\": null,\"errorMessage\": null,\"data\": [{\"ts\": %d,\"v\": \"%v\",\"q\": \"3\"}]}", fmt.Sprintf("%s.%s", apmId, tag), ts, accs)
+	body += "]}"
+
+	fmt.Println("BODY: ", body)
+	payload := strings.NewReader(body)
 
 	req, _ := http.NewRequest("POST", url, payload)
 
@@ -78,12 +82,12 @@ func detectAccelerations(msg EdisonMessage) {
 
 	if (msg.X > accThreshold) || (msg.Y > accThreshold) {
 		accMap[msgId] = accMap[msgId] + 1
-		go storeEvent(msg.Timestamp, math.Max(msg.X, msg.Y), "HA_1")
+		go storeEvent(msg.Timestamp, math.Max(msg.X, msg.Y), "Tag_Hard_Acceleration_1", assetIdMap[msgId], calcLifetime(msgId), accMap[msgId])
 		if conn == nil {
 			fmt.Println("ERROR: no active conns")
 			return
 		}
-		err = conn.WriteMessage(1, []byte(fmt.Sprintf("{\"carId\":\"%s\", \"hardAcc\": %d, \"miles\": %d, \"lifetime\": %d}", msgId, accMap[msgId], int(msg.Miles), calcLifetime(msgId))))
+		err = conn.WriteMessage(1, []byte(fmt.Sprintf("{\"carId\":\"%s\", \"apmId\":\"%s\", \"hardAcc\": %d, \"miles\": %d, \"lifetime\": %d}", msgId, assetIdMap[msgId], accMap[msgId], int(msg.Miles), calcLifetime(msgId))))
 		if err != nil {
 			fmt.Println("ERROR: could not write hard acc to ws")
 		}
@@ -92,12 +96,12 @@ func detectAccelerations(msg EdisonMessage) {
 
 	if (msg.X < -1*accThreshold) || (msg.Y < -1*accThreshold) {
 		decMap[msgId] = decMap[msgId] + 1
-		go storeEvent(msg.Timestamp, msg.Y, "Tag_Hard_Acceleration_1")
+		go storeEvent(msg.Timestamp, math.Max(msg.X, msg.Y), "Tag_Hard_Breaks_1", assetIdMap[msgId], calcLifetime(msgId), decMap[msgId])
 		if conn == nil {
 			fmt.Println("ERROR: no active conns")
 			return
 		}
-		err = conn.WriteMessage(1, []byte(fmt.Sprintf("{\"carId\":\"%s\", \"hardBreak\": %d, \"miles\": %d, \"lifetime\": %d}", msgId, decMap[msgId], int(msg.Miles), calcLifetime(msgId))))
+		err = conn.WriteMessage(1, []byte(fmt.Sprintf("{\"carId\":\"%s\", \"apmId\": \"%s\", \"hardBreak\": %d, \"miles\": %d, \"lifetime\": %d}", msgId, assetIdMap[msgId], decMap[msgId], int(msg.Miles), calcLifetime(msgId))))
 		if err != nil {
 			fmt.Println("ERROR: could not write hard break to ws")
 		}
@@ -128,6 +132,9 @@ func receive(w http.ResponseWriter, r *http.Request) {
 	_, found := startMap[msg.ID]
 	if !found {
 		startMap[msg.ID] = msg.Timestamp
+		headId := assetIds[0]
+		assetIds = assetIds[1:]
+		assetIdMap[msg.ID] = headId
 	}
 	mutex.Lock()
 	milesMap[msg.ID] = msg.Miles
@@ -150,7 +157,7 @@ func all(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	response := "["
 	for key, value := range startMap {
-		response += fmt.Sprintf("{\"carId\":\"%s\", \"startTime\": %d,\"miles\":%d, \"hardAcc\": %d, \"hardBreak\": %d, \"lifetime\": %d}", key, value, int(milesMap[key]), accMap[key], decMap[key], calcLifetime(key))
+		response += fmt.Sprintf("{\"carId\":\"%s\", \"apmId\": \"%s\", \"startTime\": %d,\"miles\":%d, \"hardAcc\": %d, \"hardBreak\": %d, \"lifetime\": %d}", key, assetIdMap[key], value, int(milesMap[key]), accMap[key], decMap[key], calcLifetime(key))
 		response += ","
 	}
 	response = strings.TrimSuffix(response, ",")
