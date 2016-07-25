@@ -166,6 +166,7 @@ func all(w http.ResponseWriter, r *http.Request) {
 }
 
 func mobile(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("HELLO MOBILE")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	var wrapper EdisonWrapper
 	body, err := ioutil.ReadAll(r.Body)
@@ -176,6 +177,7 @@ func mobile(w http.ResponseWriter, r *http.Request) {
 	err = json.Unmarshal(body, &wrapper)
 	if err != nil {
 		fmt.Println("ERROR: could not unmarshal wrapper body")
+		fmt.Printf("BODY: %s\n", string(body))
 		return
 	}
 	io.WriteString(w, "OK")
