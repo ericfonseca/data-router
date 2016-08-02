@@ -119,7 +119,7 @@ func detectAccelerations(msg EdisonMessage) {
 }
 
 func calcLifetime(carId string) int {
-	return lifetimeMax - scalingFactor*(accMap[carId]+decMap[carId])
+	return int(math.Min(float64(lifetimeMax-scalingFactor*(accMap[carId]+decMap[carId])), float64(200000)))
 }
 
 func receive(w http.ResponseWriter, r *http.Request) {
@@ -141,10 +141,17 @@ func receive(w http.ResponseWriter, r *http.Request) {
 	msg := wrapper.Form
 	_, found := startMap[msg.ID]
 	if !found {
+		startMapMutex.Lock()
 		startMap[msg.ID] = msg.Timestamp
-		headId := assetIds[0]
-		assetIds = assetIds[1:]
-		assetIdMap[msg.ID] = headId
+		startMapMutex.Unlock()
+
+		if len(assetIds) > 0 {
+			headId := assetIds[0]
+			assetIds = assetIds[1:]
+			assetIdMapMutex.Lock()
+			assetIdMap[msg.ID] = headId
+			assetIdMapMutex.Unlock()
+		}
 	}
 	milesMapMutex.Lock()
 	milesMap[msg.ID] = msg.Miles
@@ -178,13 +185,14 @@ func all(w http.ResponseWriter, r *http.Request) {
 func mobile(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("HELLO MOBILE")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	var wrapper EdisonWrapper
+	var msg EdisonMessage
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		fmt.Println("ERROR: could not read body")
 		return
 	}
-	err = json.Unmarshal(body, &wrapper)
+	fmt.Println("MOBILE BODY: ", string(body))
+	err = json.Unmarshal(body, &msg)
 	if err != nil {
 		fmt.Println("ERROR: could not unmarshal wrapper body")
 		fmt.Printf("BODY: %s\n", string(body))
@@ -192,18 +200,19 @@ func mobile(w http.ResponseWriter, r *http.Request) {
 	}
 	io.WriteString(w, "OK")
 
-	msg := wrapper.Form
 	_, found := startMap[msg.ID]
 	if !found {
 		startMapMutex.Lock()
 		startMap[msg.ID] = msg.Timestamp
 		startMapMutex.Unlock()
 
-		headId := assetIds[0]
-		assetIds = assetIds[1:]
-		assetIdMapMutex.Lock()
-		assetIdMap[msg.ID] = headId
-		assetIdMapMutex.Unlock()
+		if len(assetIds) > 0 {
+			headId := assetIds[0]
+			assetIds = assetIds[1:]
+			assetIdMapMutex.Lock()
+			assetIdMap[msg.ID] = headId
+			assetIdMapMutex.Unlock()
+		}
 	}
 	milesMapMutex.Lock()
 	milesMap[msg.ID] = msg.Miles
@@ -233,7 +242,7 @@ func queryAPMTS(w http.ResponseWriter, r *http.Request) {
 
 	}
 
-	req.Header.Add("authorization", "bearer eyJhbGciOiJSUzI1NiJ9.eyJqdGkiOiJjYWViYTM4Mi1mZjcwLTQ0MmItOTIwZS1iNGRmZjI3MjQ4ZGIiLCJzdWIiOiI2YWQ5Nzg3Ny0zMTQ3LTQyYzUtOGIwNi1iY2U3NTU5OTNmMzMiLCJzY29wZSI6WyJwYXNzd29yZC53cml0ZSIsIm9wZW5pZCJdLCJjbGllbnRfaWQiOiJpbmdlc3Rvci45Y2YzM2NlMzdiZjY0YzU2ODFiNTE1YTZmNmFhZGY0NyIsImNpZCI6ImluZ2VzdG9yLjljZjMzY2UzN2JmNjRjNTY4MWI1MTVhNmY2YWFkZjQ3IiwiYXpwIjoiaW5nZXN0b3IuOWNmMzNjZTM3YmY2NGM1NjgxYjUxNWE2ZjZhYWRmNDciLCJncmFudF90eXBlIjoicGFzc3dvcmQiLCJ1c2VyX2lkIjoiNmFkOTc4NzctMzE0Ny00MmM1LThiMDYtYmNlNzU1OTkzZjMzIiwib3JpZ2luIjoidWFhIiwidXNlcl9uYW1lIjoic2siLCJlbWFpbCI6ImphbmVAZ2UuY29tIiwiYXV0aF90aW1lIjoxNDY5NDM5NDUyLCJyZXZfc2lnIjoiYjc0NzUwYmQiLCJpYXQiOjE0Njk0Mzk0NTIsImV4cCI6MTQ2OTUyNTg1MiwiaXNzIjoiaHR0cHM6Ly9kOWVmMTA2Yy03MDQ4LTQ4NmUtYTc5Zi05YzgwODI3YjhhMTQucHJlZGl4LXVhYS5ydW4uYXdzLXVzdzAyLXByLmljZS5wcmVkaXguaW8vb2F1dGgvdG9rZW4iLCJ6aWQiOiJkOWVmMTA2Yy03MDQ4LTQ4NmUtYTc5Zi05YzgwODI3YjhhMTQiLCJhdWQiOlsiaW5nZXN0b3IuOWNmMzNjZTM3YmY2NGM1NjgxYjUxNWE2ZjZhYWRmNDciLCJwYXNzd29yZCIsIm9wZW5pZCJdfQ.wC0Tfbq1m9W6OOmFTcJ0THJohRgV7SEdwH3tyoWX2by8MrbWGWT1Ne5Y4iioPkNeS0y987yKljp7YVghWcpyovKFknG_0RNttsf55u4lMiWTgxHaHidZU_UETLGS-byJYO5Bkn-xP-hG5-BNjpNDw4-u-xdUU_DCmY4XTR6QNA3uregJIGt-v8-dDej_z1fAN01Bw-MjrdD4zvHPU4UoYug4bBqw2ckYB9MWF94qRqj5iOsCALXOlJHaisAoPHQVgsQgJ8fFuh8DX9eEziQ1Bew5rEMzjPRtRzUDbwkEmjyEn9YPGSpp1kfCvloxZ6fLQcwuMbtJnqxCKvyU_bS6ow")
+	req.Header.Add("authorization", "bearer eyJhbGciOiJSUzI1NiJ9.eyJqdGkiOiIyY2QyOWE0Zi1mZmM1LTRjZDUtYTllZS0wN2I0ODFhNDNkMWQiLCJzdWIiOiJlNDNkNjlmMC01NjlkLTQxOGEtYjMzYi05ZjAxYjY1NGNkOTMiLCJzY29wZSI6WyJwYXNzd29yZC53cml0ZSIsIm9wZW5pZCJdLCJjbGllbnRfaWQiOiJpbmdlc3Rvci45Y2YzM2NlMzdiZjY0YzU2ODFiNTE1YTZmNmFhZGY0NyIsImNpZCI6ImluZ2VzdG9yLjljZjMzY2UzN2JmNjRjNTY4MWI1MTVhNmY2YWFkZjQ3IiwiYXpwIjoiaW5nZXN0b3IuOWNmMzNjZTM3YmY2NGM1NjgxYjUxNWE2ZjZhYWRmNDciLCJncmFudF90eXBlIjoicGFzc3dvcmQiLCJ1c2VyX2lkIjoiZTQzZDY5ZjAtNTY5ZC00MThhLWIzM2ItOWYwMWI2NTRjZDkzIiwib3JpZ2luIjoidWFhIiwidXNlcl9uYW1lIjoiZ2VuZXNpc191c2VyMSIsImVtYWlsIjoiam9lQGdlLmNvbSIsImF1dGhfdGltZSI6MTQ3MDE2NDk1OCwicmV2X3NpZyI6IjNjMzE2YjM3IiwiaWF0IjoxNDcwMTY0OTU4LCJleHAiOjE0NzAyNTEzNTgsImlzcyI6Imh0dHBzOi8vZDllZjEwNmMtNzA0OC00ODZlLWE3OWYtOWM4MDgyN2I4YTE0LnByZWRpeC11YWEucnVuLmF3cy11c3cwMi1wci5pY2UucHJlZGl4LmlvL29hdXRoL3Rva2VuIiwiemlkIjoiZDllZjEwNmMtNzA0OC00ODZlLWE3OWYtOWM4MDgyN2I4YTE0IiwiYXVkIjpbImluZ2VzdG9yLjljZjMzY2UzN2JmNjRjNTY4MWI1MTVhNmY2YWFkZjQ3IiwicGFzc3dvcmQiLCJvcGVuaWQiXX0.DHsxfeFtTBd833JhxGg3MTh7_mWIURan_De-RLKpEtXGxLvWMwALjdBPe_-n9PHs3vot3n-JE4ja9IBajtH2ZsG_lZox_nTW8MIyohJDgAFF_9B0cR0oVPvXDW02GWK7qxHGfNIIRx30sACqInyjEOBYJV20b7Tn3eigHjJxVr96Zh_hu-kJHjwxDbZGqqdRLXET94b2kWklLiFauD7Q1dz1r-qb5h4ughfZckhjhQQ6y2iVNT4a6wfU-nll97UHs6IRTQ26FycmPGWvAoJ3Y4GGiuZpiiaywQa8y1iTijkDV4_Ade7AaMSqhI-tkrfjGs7VhC7uZN0fzgl0S9uilg")
 	req.Header.Add("tenant", tenant)
 	req.Header.Add("content-type", "application/json")
 	req.Header.Add("cache-control", "no-cache")
@@ -255,14 +264,16 @@ func queryAPMTS(w http.ResponseWriter, r *http.Request) {
 }
 
 func gradualImprovement() {
-	ticker := time.NewTicker(1 * time.Second)
+	ticker := time.NewTicker(2 * time.Second)
 	for {
 		select {
 		case <-ticker.C:
 			lifetimeMax += 250
 			for key, _ := range startMap {
-				msg := fmt.Sprintf("{\"carId\":\"%s\", \"apmId\":\"%s\", \"hardAcc\": %d, \"miles\": %d, \"lifetime\": %d}", key, assetIdMap[key], accMap[key], milesMap[key], calcLifetime(key))
-				fmt.Println("WS MSG: ", msg)
+				msg := fmt.Sprintf("{\"carId\":\"%s\", \"apmId\":\"%s\", \"hardAcc\": %d, \"miles\": %d, \"lifetime\": %d}", key, assetIdMap[key], accMap[key], int(milesMap[key]), calcLifetime(key))
+				if conn == nil {
+					break
+				}
 				err := conn.WriteMessage(1, []byte(msg))
 				if err != nil {
 					fmt.Println("ERROR: could not write hard acc to ws")
@@ -272,15 +283,58 @@ func gradualImprovement() {
 	}
 }
 
+func clearMap(m map[string]string) {
+	for k := range m {
+		delete(m, k)
+	}
+}
+
+func clear(w http.ResponseWriter, r *http.Request) {
+	lifetimeMax = 150000
+	assetIds = []string{"320I-UID1", "320I-UID2", "320I-UID3", "320I-UID4", "320I-UID5", "320I-UID6", "320I-UID7", "320I-UID8", "320I-UID9", "320I-UID10", "320I-UID11", "320I-UID12"}
+	assetIdMapMutex.Lock()
+	decMapMutex.Lock()
+	accMapMutex.Lock()
+	milesMapMutex.Lock()
+	startMapMutex.Lock()
+
+	for k := range assetIdMap {
+		delete(assetIdMap, k)
+	}
+
+	for k := range decMap {
+		delete(decMap, k)
+	}
+
+	for k := range accMap {
+		delete(accMap, k)
+	}
+
+	for k := range milesMap {
+		delete(milesMap, k)
+	}
+
+	for k := range startMap {
+		delete(startMap, k)
+	}
+
+	assetIdMapMutex.Unlock()
+	decMapMutex.Unlock()
+	accMapMutex.Unlock()
+	milesMapMutex.Unlock()
+	startMapMutex.Unlock()
+}
+
 func main() {
+	go gradualImprovement()
+
 	http.HandleFunc("/", receive)
 	http.HandleFunc("/listen", listen)
 	http.HandleFunc("/all", all)
 	http.HandleFunc("/mobile", mobile)
 	http.HandleFunc("/queryTS", queryAPMTS)
+	http.HandleFunc("/clear", clear)
 	http.ListenAndServe(":"+os.Getenv("PORT"), nil)
-
-	go gradualImprovement()
 	// test ingest
 	// storeEvent(1469437879000, 1, "Tag_Hard_Breaks_2")
 }
