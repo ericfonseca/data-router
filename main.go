@@ -52,6 +52,7 @@ var (
 	accMapMutex     = &sync.Mutex{}
 	milesMapMutex   = &sync.Mutex{}
 	startMapMutex   = &sync.Mutex{}
+	token           = os.Getenv("TOKEN")
 )
 
 func storeEvent(ts uint64, val float64, tag string, apmId string, lifetime int, accs int) {
@@ -67,7 +68,7 @@ func storeEvent(ts uint64, val float64, tag string, apmId string, lifetime int, 
 
 	req, _ := http.NewRequest("POST", url, payload)
 
-	req.Header.Add("authorization", "bearer eyJhbGciOiJSUzI1NiJ9.eyJqdGkiOiI0ZDJkMGYzMy1jYjAzLTRjMGQtYTgwNC0zNjBmY2NjMjYyMDMiLCJzdWIiOiJlNDNkNjlmMC01NjlkLTQxOGEtYjMzYi05ZjAxYjY1NGNkOTMiLCJzY29wZSI6WyJwYXNzd29yZC53cml0ZSIsIm9wZW5pZCJdLCJjbGllbnRfaWQiOiJpbmdlc3Rvci45Y2YzM2NlMzdiZjY0YzU2ODFiNTE1YTZmNmFhZGY0NyIsImNpZCI6ImluZ2VzdG9yLjljZjMzY2UzN2JmNjRjNTY4MWI1MTVhNmY2YWFkZjQ3IiwiYXpwIjoiaW5nZXN0b3IuOWNmMzNjZTM3YmY2NGM1NjgxYjUxNWE2ZjZhYWRmNDciLCJncmFudF90eXBlIjoicGFzc3dvcmQiLCJ1c2VyX2lkIjoiZTQzZDY5ZjAtNTY5ZC00MThhLWIzM2ItOWYwMWI2NTRjZDkzIiwib3JpZ2luIjoidWFhIiwidXNlcl9uYW1lIjoiZ2VuZXNpc191c2VyMSIsImVtYWlsIjoiam9lQGdlLmNvbSIsImF1dGhfdGltZSI6MTQ2OTQyNjUxNCwicmV2X3NpZyI6IjNjMzE2YjM3IiwiaWF0IjoxNDY5NDI2NTE0LCJleHAiOjE0Njk1MTI5MTQsImlzcyI6Imh0dHBzOi8vZDllZjEwNmMtNzA0OC00ODZlLWE3OWYtOWM4MDgyN2I4YTE0LnByZWRpeC11YWEucnVuLmF3cy11c3cwMi1wci5pY2UucHJlZGl4LmlvL29hdXRoL3Rva2VuIiwiemlkIjoiZDllZjEwNmMtNzA0OC00ODZlLWE3OWYtOWM4MDgyN2I4YTE0IiwiYXVkIjpbImluZ2VzdG9yLjljZjMzY2UzN2JmNjRjNTY4MWI1MTVhNmY2YWFkZjQ3IiwicGFzc3dvcmQiLCJvcGVuaWQiXX0.Nl1hD5-pTtehZbmhxA8BXO97Qi39ml_-Tn8vqeoSHIPpqTWkCWHAk8k9vtc5_WWxIfj1V6tBfRQ5f6S5dEqh78jjR099xOOrrcGi9yhob7MydjaE5VvCk5hqwU87w8vOLwhI7cRSruHLij8zClgWEJd-LwcRXXK7zpgBBqBN5AK3DZ5HaoP0VHZJaJsQykEUk6EM8G_BeUxQEaZr6TxXyd-C2flxxq9tqDWyCTu1YZ-KRnXKbdtU5Hw0ONfPK3951EHwLUxvSMbIXalDLcf1UQTL7yRsnaBt4s7R40CBei9wl3LtejluZ34CCthT1y67nUL7uZ7Ay-l4xu1E4Mp2zw")
+	req.Header.Add("authorization", token)
 	req.Header.Add("tenant", "E1AB6F7711A5403FB2B607EA1306D94F")
 	req.Header.Add("content-type", "application/json")
 	req.Header.Add("accept", "application/json")
@@ -224,7 +225,7 @@ func mobile(w http.ResponseWriter, r *http.Request) {
 }
 
 func queryAPMTS(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Access-Control-Allow-Origin", fmt.Sprintf("localhost:8000"))
+	w.Header().Set("Access-Control-Allow-Origin", fmt.Sprintf("*"))
 
 	tag := r.URL.Query().Get("tag")
 	tenant := r.URL.Query().Get("tenant")
@@ -242,7 +243,7 @@ func queryAPMTS(w http.ResponseWriter, r *http.Request) {
 
 	}
 
-	req.Header.Add("authorization", "bearer eyJhbGciOiJSUzI1NiJ9.eyJqdGkiOiIyY2QyOWE0Zi1mZmM1LTRjZDUtYTllZS0wN2I0ODFhNDNkMWQiLCJzdWIiOiJlNDNkNjlmMC01NjlkLTQxOGEtYjMzYi05ZjAxYjY1NGNkOTMiLCJzY29wZSI6WyJwYXNzd29yZC53cml0ZSIsIm9wZW5pZCJdLCJjbGllbnRfaWQiOiJpbmdlc3Rvci45Y2YzM2NlMzdiZjY0YzU2ODFiNTE1YTZmNmFhZGY0NyIsImNpZCI6ImluZ2VzdG9yLjljZjMzY2UzN2JmNjRjNTY4MWI1MTVhNmY2YWFkZjQ3IiwiYXpwIjoiaW5nZXN0b3IuOWNmMzNjZTM3YmY2NGM1NjgxYjUxNWE2ZjZhYWRmNDciLCJncmFudF90eXBlIjoicGFzc3dvcmQiLCJ1c2VyX2lkIjoiZTQzZDY5ZjAtNTY5ZC00MThhLWIzM2ItOWYwMWI2NTRjZDkzIiwib3JpZ2luIjoidWFhIiwidXNlcl9uYW1lIjoiZ2VuZXNpc191c2VyMSIsImVtYWlsIjoiam9lQGdlLmNvbSIsImF1dGhfdGltZSI6MTQ3MDE2NDk1OCwicmV2X3NpZyI6IjNjMzE2YjM3IiwiaWF0IjoxNDcwMTY0OTU4LCJleHAiOjE0NzAyNTEzNTgsImlzcyI6Imh0dHBzOi8vZDllZjEwNmMtNzA0OC00ODZlLWE3OWYtOWM4MDgyN2I4YTE0LnByZWRpeC11YWEucnVuLmF3cy11c3cwMi1wci5pY2UucHJlZGl4LmlvL29hdXRoL3Rva2VuIiwiemlkIjoiZDllZjEwNmMtNzA0OC00ODZlLWE3OWYtOWM4MDgyN2I4YTE0IiwiYXVkIjpbImluZ2VzdG9yLjljZjMzY2UzN2JmNjRjNTY4MWI1MTVhNmY2YWFkZjQ3IiwicGFzc3dvcmQiLCJvcGVuaWQiXX0.DHsxfeFtTBd833JhxGg3MTh7_mWIURan_De-RLKpEtXGxLvWMwALjdBPe_-n9PHs3vot3n-JE4ja9IBajtH2ZsG_lZox_nTW8MIyohJDgAFF_9B0cR0oVPvXDW02GWK7qxHGfNIIRx30sACqInyjEOBYJV20b7Tn3eigHjJxVr96Zh_hu-kJHjwxDbZGqqdRLXET94b2kWklLiFauD7Q1dz1r-qb5h4ughfZckhjhQQ6y2iVNT4a6wfU-nll97UHs6IRTQ26FycmPGWvAoJ3Y4GGiuZpiiaywQa8y1iTijkDV4_Ade7AaMSqhI-tkrfjGs7VhC7uZN0fzgl0S9uilg")
+	req.Header.Add("authorization", token)
 	req.Header.Add("tenant", tenant)
 	req.Header.Add("content-type", "application/json")
 	req.Header.Add("cache-control", "no-cache")
@@ -290,6 +291,8 @@ func clearMap(m map[string]string) {
 }
 
 func clear(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", fmt.Sprintf("*"))
+
 	lifetimeMax = 150000
 	assetIds = []string{"320I-UID1", "320I-UID2", "320I-UID3", "320I-UID4", "320I-UID5", "320I-UID6", "320I-UID7", "320I-UID8", "320I-UID9", "320I-UID10", "320I-UID11", "320I-UID12"}
 	assetIdMapMutex.Lock()
